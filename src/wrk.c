@@ -49,7 +49,7 @@ static void handler(int sig) {
     stop = 1;
 }
 
-static uint64_t start_time;
+static uint64_t start_time, last_report_time;
 static struct hdr_histogram* latency_histogram;
 static struct hdr_histogram* u_latency_histogram;
 static thread *work_threads;
@@ -84,11 +84,11 @@ static void usage() {
            "  Time arguments may include a time unit (2s, 2m, 2h)     \n");
 }
 
-void gen_stats() {
+void gen_stats(uint64_t start) {
     uint64_t complete = 0;
     uint64_t bytes    = 0;
     errors errors     = { 0 };
-    uint64_t runtime_us = time_us() - start_time;
+    uint64_t runtime_us = time_us() - start;
 
     for (uint64_t i = 0; i < cfg.threads; i++) {
         thread *t = &work_threads[i];
@@ -157,7 +157,27 @@ void gen_stats() {
 }
 
 static int period_report_func(aeEventLoop *loop, long long id, void *data) {
-    gen_stats();
+    gen_stats(last_report_time);
+    last_report_time = time_us();
+    for (uint64_t i = 0; i < cfg.threads; i++) {
+        thread *t = &work_threads[i];
+        pthread_mutex_lock(&t->mutex);
+
+        hdr_reset(t->latency_histogram);
+        hdr_reset(t->u_latency_histogram);
+        t->complete = t->requests = t->bytes = 0;
+        memset(&t->errors, 0, sizeof(t->errors));
+
+        pthread_mutex_unlock(&t->mutex);
+    }
+
+    pthread_mutex_lock(&statistics.mutex);
+    hdr_reset(statistics.requests->histogram);
+    pthread_mutex_unlock(&statistics.mutex);
+
+    hdr_reset(latency_histogram);
+    hdr_reset(u_latency_histogram);
+
     return cfg.report_interval;
 }
 
@@ -253,6 +273,7 @@ int main(int argc, char **argv) {
         t->connections = connections;
         t->throughput  = throughput;
         t->stop_at     = stop_at;
+        pthread_mutex_init(&t->mutex, NULL);
 
         t->L = script_create(schema, host, port, path);
         script_headers(t->L, headers);
@@ -307,9 +328,10 @@ int main(int argc, char **argv) {
     if (cfg.report_interval) {
         aeStop(pr_loop);
         aeDeleteEventLoop(pr_loop);
+    } else {
+        // Accumulated reports
+        gen_stats(start_time);
     }
-
-    gen_stats();
     return 0;
 }
 

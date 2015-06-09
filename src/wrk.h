@@ -25,6 +25,7 @@
 
 typedef struct {
     pthread_t thread;
+    pthread_mutex_t mutex;
     aeEventLoop *loop;
     uint64_t connections;
     int interval;
