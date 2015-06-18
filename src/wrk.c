@@ -154,6 +154,8 @@ void gen_stats(uint64_t start) {
         script_errors(L, &errors);
         script_done(L, latency_stats, statistics.requests);
     }
+
+    printf("=== REPORT END ===\n");
 }
 
 static int period_report_func(aeEventLoop *loop, long long id, void *data) {
