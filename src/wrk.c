@@ -154,12 +154,11 @@ void gen_stats(uint64_t start) {
         script_errors(L, &errors);
         script_done(L, latency_stats, statistics.requests);
     }
-
-    printf("=== REPORT END ===\n");
 }
 
 static int period_report_func(aeEventLoop *loop, long long id, void *data) {
     gen_stats(last_report_time);
+    printf("=== REPORT END ===\n");
     last_report_time = time_us();
     for (uint64_t i = 0; i < cfg.threads; i++) {
         thread *t = &work_threads[i];
