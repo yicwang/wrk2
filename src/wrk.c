@@ -306,6 +306,7 @@ int main(int argc, char **argv) {
     sigaction(SIGINT, &sa, NULL);
 
     start_time = time_us();
+    last_report_time = time_us();
     hdr_init(1, MAX_LATENCY, 3, &latency_histogram);
     hdr_init(1, MAX_LATENCY, 3, &u_latency_histogram);
 
