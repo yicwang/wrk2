@@ -143,7 +143,7 @@ int hdr_init(
 
     int32_t sub_bucket_count      = (int32_t) pow(2, (sub_bucket_half_count_magnitude + 1));
     int32_t sub_bucket_half_count = sub_bucket_count / 2;
-    int32_t sub_bucket_mask       = (sub_bucket_count - 1) << unit_magnitude;
+    int64_t sub_bucket_mask       = ((int64_t) sub_bucket_count - 1) << unit_magnitude;
 
     // determine exponent range needed to support the trackable value with no overflow:
     int64_t trackable_value = (int64_t) sub_bucket_mask;
@@ -179,7 +179,6 @@ int hdr_init(
     histogram->total_count                     = 0;
 
     *result = histogram;
-
     return 0;
 }
 

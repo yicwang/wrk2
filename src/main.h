@@ -56,5 +56,6 @@ static void print_stats_header();
 static void print_stats(char *, stats *, char *(*)(long double));
 static void print_stats_latency(stats *);
 static void print_hdr_latency(struct hdr_histogram*, const char*);
+static void print_buckets_json(struct hdr_histogram*);
 
 #endif /* MAIN_H */
