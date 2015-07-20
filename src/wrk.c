@@ -178,12 +178,14 @@ void gen_stats(uint64_t start) {
             if (errors.timeout) {
                 printf("%s\"timeout\": %d", prefix, errors.timeout);
             }
+            if (errors.status) {
+                printf("%s\"http_error\": %d", prefix, errors.status);
+            }
             printf("},\n");
         }
-        printf("\"min\"=%lld, \"max\"=%lld, \"rps\": %.2Lf, \"rx_bps\": %sB\"\n}\n",
-               hdr_min(latency_histogram),
-               hdr_max(latency_histogram),
-               req_per_s, format_binary(bytes_per_s));
+        printf("\"total_req\": %"PRIu64", \"rps\": %.2Lf, \"rx_bps\": \"%sB\"\n",
+               complete, req_per_s, format_binary(bytes_per_s));
+        printf("}\n");
     }
 
     lua_State *L = work_threads[0].L;
@@ -990,28 +992,32 @@ static void print_buckets_json(struct hdr_histogram* histogram) {
     if (cfg.report_interval) {
         printf("\"seq\": %d,\n", seq++);
     }
-    printf("\"counters\":[\n");
+    printf("\"latency\": {\n");
+    printf("    \"min\": %"PRId64", \"max\": %"PRId64",\n",
+           hdr_min(latency_histogram),
+           hdr_max(latency_histogram)),
+    printf("    \"counters\": [\n");
     int count = 0;
     while (hdr_recorded_iter_next(&recorded)) {
         if (recorded.iter.bucket_index != prev_bucket_index) {
             if (prev_bucket_index >= 0) {
                 printf("], \n");
             }
-            printf("    %d, [", recorded.iter.bucket_index);
+            printf("        %d, [", recorded.iter.bucket_index);
         } else {
             if (count & 0x07)
                printf(", ");
             else
-               printf("\n");
+               printf(",\n        ");
         }
         ++count;
-        printf("%d, %lld", recorded.iter.sub_bucket_index, recorded.iter.count_at_index);
+        printf("%d, %"PRId64"", recorded.iter.sub_bucket_index, recorded.iter.count_at_index);
         prev_bucket_index = recorded.iter.bucket_index;
     }
     if (prev_bucket_index >= 0) {
         printf("]\n");
     }
-    printf("    ],\n");
+    printf("    ]\n},\n");
 }
 
 static void print_stats_latency(stats *stats) {
