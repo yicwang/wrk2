@@ -374,6 +374,7 @@ int main(int argc, char **argv) {
     if (cfg.report_interval) {
         aeStop(pr_loop);
         aeDeleteEventLoop(pr_loop);
+        gen_stats(last_report_time);
     } else {
         // Accumulated reports
         gen_stats(start_time);
