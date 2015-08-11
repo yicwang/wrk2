@@ -8,12 +8,13 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <hdr/hdr_histogram.h>
+#include <hdr/hdr_histogram_log.h>
 
 #include "stats.h"
 #include "ae.h"
 #include "script.h"
 #include "http_parser.h"
-#include "hdr_histogram.h"
 
 #define VERSION  "3.1.1"
 #define RECVBUF  8192
