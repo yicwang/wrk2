@@ -8,8 +8,6 @@
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
-#include <hdr/hdr_histogram.h>
-#include <hdr/hdr_histogram_log.h>
 
 #include "stats.h"
 #include "ae.h"

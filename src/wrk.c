@@ -3,6 +3,8 @@
 #include "wrk.h"
 #include "main.h"
 #include "stats.h"
+#include <hdr/hdr_histogram.h>
+#include <hdr/hdr_histogram_log.h>
 
 // Max recordable latency of 1 day
 #define MAX_LATENCY 24L * 60 * 60 * 1000000
@@ -139,10 +141,13 @@ void gen_stats(uint64_t start) {
             if (errors.timeout) {
                 printf("%s\"timeout\": %d", prefix, errors.timeout);
             }
+            if (errors.status) {
+                printf("%s\"http_error\": %d", prefix, errors.status);
+            }
             printf("},\n");
         }
-        printf("\"rps\": %.2Lf, \"rx_bps\": %sB\",\n",
-               req_per_s, format_binary(bytes_per_s));
+        printf("\"total_req\": %"PRIu64", \"rps\": %.2Lf, \"rx_bps\": %sB\",\n",
+               complete, req_per_s, format_binary(bytes_per_s));
         if (hdr_log_encode(latency_histogram, &encoded)) {
             encoded = "";
         }
@@ -369,6 +374,7 @@ int main(int argc, char **argv) {
     if (cfg.report_interval) {
         aeStop(pr_loop);
         aeDeleteEventLoop(pr_loop);
+        gen_stats(last_report_time);
     } else {
         // Accumulated reports
         gen_stats(start_time);
