@@ -2,8 +2,9 @@
 
 #include "wrk.h"
 #include "main.h"
-#include "hdr_histogram.h"
 #include "stats.h"
+#include <hdr/hdr_histogram.h>
+#include <hdr/hdr_histogram_log.h>
 
 // Max recordable latency of 1 day
 #define MAX_LATENCY 24L * 60 * 60 * 1000000
@@ -19,7 +20,7 @@ static struct config {
     uint64_t delay_ms;
     uint64_t report_interval;
     int      digits;
-    bool     json;
+    bool     json_encoding;
     bool     latency;
     bool     u_latency;
     bool     dynamic;
@@ -80,8 +81,8 @@ static void usage() {
            "                               in requests/sec (total)    \n"
            "                               [Required Parameter]       \n"
            "    -p, --report_interval <T>  Periodical report interval \n"
-           "                               in seconds def=disabled\n"
-           "    -j, --json                 print buckets in JSON def=disabled\n"
+           "                               in seconds (def=disabled)\n"
+           "    -e, --encoded              print results in JSON encoded format (def=disabled)\n"
            "                                                          \n"
            "                                                          \n"
            "  Numeric arguments may include a SI unit (1k, 1M, 1G)    \n"
@@ -118,47 +119,9 @@ void gen_stats(uint64_t start) {
     latency_stats->max = hdr_max(latency_histogram);
     latency_stats->histogram = latency_histogram;
 
-    if (!cfg.json) {
-        print_stats_header();
-        print_stats("Latency", latency_stats, format_time_us);
-        print_stats("Req/Sec", statistics.requests, format_metric);
-    }
-    if (cfg.latency) print_stats_latency(latency_stats);
-
-    if (cfg.latency) {
-        print_hdr_latency(latency_histogram,
-                "Recorded Latency");
-        printf("----------------------------------------------------------\n");
-    }
-
-    if (cfg.u_latency) {
-        printf("\n");
-        print_hdr_latency(u_latency_histogram,
-                "Uncorrected Latency (measured without taking delayed starts into account)");
-        printf("----------------------------------------------------------\n");
-    }
-
-    if (cfg.json) {
+    if (cfg.json_encoding) {
+        char *encoded;
         printf("{\n");
-        print_buckets_json(latency_histogram);
-    }
-
-    char *runtime_msg = format_time_us(runtime_us);
-
-    if (!cfg.json) {
-        printf("  %"PRIu64" requests in %s, %sB read\n",
-                complete, runtime_msg, format_binary(bytes));
-        if (errors.connect || errors.read || errors.write || errors.timeout) {
-            printf("  Socket errors: connect %d, read %d, write %d, timeout %d\n",
-                   errors.connect, errors.read, errors.write, errors.timeout);
-        }
-        if (errors.status) {
-            printf("  Non-2xx or 3xx responses: %d\n", errors.status);
-        }
-        printf("Requests/sec: %9.2Lf\n", req_per_s);
-        printf("Transfer/sec: %10sB\n", format_binary(bytes_per_s));
-
-    } else {
         if (errors.connect || errors.read || errors.write || errors.timeout) {
             const char* comma_sep = ", ";
             const char *prefix = "";
@@ -183,9 +146,47 @@ void gen_stats(uint64_t start) {
             }
             printf("},\n");
         }
-        printf("\"total_req\": %"PRIu64", \"rps\": %.2Lf, \"rx_bps\": \"%sB\"\n",
+        printf("\"total_req\": %"PRIu64", \"rps\": %.2Lf, \"rx_bps\": \"%sB\",\n",
                complete, req_per_s, format_binary(bytes_per_s));
-        printf("}\n");
+        if (hdr_log_encode(latency_histogram, &encoded)) {
+            encoded = "";
+        }
+        printf("\"hist\": \"%s\"\n}\n", encoded);
+        fflush(stdout);
+        free(encoded);
+    } else {
+
+
+        print_stats_header();
+        print_stats("Latency", latency_stats, format_time_us);
+        print_stats("Req/Sec", statistics.requests, format_metric);
+
+        if (cfg.latency) {
+            print_stats_latency(latency_stats);
+            print_hdr_latency(latency_histogram,
+                    "Recorded Latency");
+            printf("----------------------------------------------------------\n");
+        }
+
+        if (cfg.u_latency) {
+            printf("\n");
+            print_hdr_latency(u_latency_histogram,
+                    "Uncorrected Latency (measured without taking delayed starts into account)");
+            printf("----------------------------------------------------------\n");
+        }
+
+        char *runtime_msg = format_time_us(runtime_us);
+        printf("  %"PRIu64" requests in %s, %sB read\n",
+                complete, runtime_msg, format_binary(bytes));
+        if (errors.connect || errors.read || errors.write || errors.timeout) {
+            printf("  Socket errors: connect %d, read %d, write %d, timeout %d\n",
+                   errors.connect, errors.read, errors.write, errors.timeout);
+        }
+        if (errors.status) {
+            printf("  Non-2xx or 3xx responses: %d\n", errors.status);
+        }
+        printf("Requests/sec: %9.2Lf\n", req_per_s);
+        printf("Transfer/sec: %10sB\n", format_binary(bytes_per_s));
     }
 
     lua_State *L = work_threads[0].L;
@@ -198,7 +199,7 @@ void gen_stats(uint64_t start) {
 
 static int period_report_func(aeEventLoop *loop, long long id, void *data) {
     gen_stats(last_report_time);
-    if (!cfg.json) {
+    if (!cfg.json_encoding) {
         printf("=== REPORT END ===\n");
     }
     last_report_time = time_us();
@@ -352,7 +353,7 @@ int main(int argc, char **argv) {
     hdr_init(1, MAX_LATENCY, cfg.digits, &u_latency_histogram);
 
     char *time = format_time_s(cfg.duration);
-    if (!cfg.json) {
+    if (!cfg.json_encoding) {
         printf("Running %s test @ %s\n", time, url);
         printf("  %"PRIu64" threads and %"PRIu64" connections\n",
                cfg.threads, cfg.connections);
@@ -491,7 +492,7 @@ static int calibrate(aeEventLoop *loop, long long id, void *data) {
     thread->interval = interval;
     thread->requests = 0;
 
-    if (!cfg.json) {
+    if (!cfg.json_encoding) {
         printf("  Thread calibration: mean lat.: %.3fms, rate sampling interval: %dms\n",
                 (thread->mean)/1000.0,
                 thread->interval);
@@ -831,7 +832,7 @@ static struct option longopts[] = {
     { "threads",         required_argument, NULL, 't' },
     { "script",          required_argument, NULL, 's' },
     { "header",          required_argument, NULL, 'H' },
-    { "json",            no_argument,       NULL, 'j' },
+    { "json_encoding",    no_argument,       NULL, 'e' },
     { "latency",         no_argument,       NULL, 'L' },
     { "u_latency",       no_argument,       NULL, 'U' },
     { "batch_latency",   no_argument,       NULL, 'B' },
@@ -856,7 +857,7 @@ static int parse_args(struct config *cfg, char **url, char **headers, int argc, 
     cfg->rate        = 0;
     cfg->record_all_reponses = true;
 
-    while ((c = getopt_long(argc, argv, "hD:t:c:d:s:H:T:R:p:jLUBrv?", longopts, NULL)) != -1) {
+    while ((c = getopt_long(argc, argv, "hD:t:c:d:s:H:T:R:p:eLUBrv?", longopts, NULL)) != -1) {
         switch (c) {
             case 'D':
                 cfg->digits = atoi(optarg);
@@ -876,8 +877,8 @@ static int parse_args(struct config *cfg, char **url, char **headers, int argc, 
             case 'H':
                 *header++ = optarg;
                 break;
-            case 'j':
-                cfg->json = true;
+            case 'e':
+                cfg->json_encoding = true;
                 break;
             case 'L':
                 cfg->latency = true;
@@ -977,48 +978,6 @@ static void print_hdr_latency(struct hdr_histogram* histogram, const char* descr
     }
     printf("\n%s\n", "  Detailed Percentile spectrum:");
     hdr_percentiles_print(histogram, stdout, 5, 1000.0, CLASSIC);
-}
-
-static void print_buckets_json(struct hdr_histogram* histogram) {
-    struct hdr_recorded_iter recorded;
-    static int seq = 0;
-    hdr_recorded_iter_init(&recorded, histogram);
-    int prev_bucket_index = -1;
-    if (!seq) {
-        printf("\"buckets\":%d, \"sub_buckets\": %d, \"digits\": %d, \"max_latency\": %ld,\n",
-                  histogram->bucket_count,
-                  histogram->sub_bucket_count,
-                  cfg.digits, MAX_LATENCY);
-    }
-    if (cfg.report_interval) {
-        printf("\"seq\": %d,\n", seq++);
-    }
-    printf("\"latency\": {\n");
-    printf("    \"min\": %"PRId64", \"max\": %"PRId64",\n",
-           hdr_min(latency_histogram),
-           hdr_max(latency_histogram)),
-    printf("    \"counters\": [\n");
-    int count = 0;
-    while (hdr_recorded_iter_next(&recorded)) {
-        if (recorded.iter.bucket_index != prev_bucket_index) {
-            if (prev_bucket_index >= 0) {
-                printf("], \n");
-            }
-            printf("        %d, [", recorded.iter.bucket_index);
-        } else {
-            if (count & 0x07)
-               printf(", ");
-            else
-               printf(",\n        ");
-        }
-        ++count;
-        printf("%d, %"PRId64"", recorded.iter.sub_bucket_index, recorded.iter.count_at_index);
-        prev_bucket_index = recorded.iter.bucket_index;
-    }
-    if (prev_bucket_index >= 0) {
-        printf("]\n");
-    }
-    printf("    ]\n},\n");
 }
 
 static void print_stats_latency(stats *stats) {

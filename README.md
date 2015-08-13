@@ -1,6 +1,66 @@
 # wrk2
 
-  **a HTTP benchmarking tool based mostly on wrk**
+**a HTTP benchmarking tool based mostly on wrk**
+
+## Fork Notes
+
+  This is a fork of the original wrk2 git repository (https://github.com/giltene/wrk2).
+  The main modifications are in the following areas:
+  - add a periodic reporting argument to report results at regular
+    interval
+  - add a digits precision argument (-D) to specify how many digits of precision
+    are required for the latency values (default is still 3 digits)
+  - add a JSON encoded argument (-e) to generate results in JSON format
+  - use of the HdrHistogram_c git repository (instead of an old copy, see Build below)
+
+
+Periodic reporting is useful in situations where latency needs to be tracked in real time
+for example to follow impact of certain network failure conditions on
+HTTP latency. This is achieved by passing the -p argument.
+
+Digits precision has a direct impact on the size of the histogram. The default 3-digit
+precision is actually too high for most uses, in most cases, 2-digit precision
+(which is 1% of the values) is more than sufficient.
+
+JSON encoding is useful in cases where the results need to be interpreted by code as it
+is better to use a standard encoding like JSON than extracting information from regular
+text. One of the most useful feature of the JSON encoding is to also contain a lossless
+representation of the latency histogram in compressed form that is compliant to the
+HdrHistogram encoding format V1. This allows code to query the full histogram using
+any standard HdrHistogram compliant library (available in Java, C, python) and to do
+for example full fidelity aggegation of histograms.
+
+Example of JSON output:
+
+    $ ./wrk -e -d 20 -t 2 -D 2 -R 30 http://www.google.com
+    {
+    "rps": 29.96, "rx_bps": 17.03KB",
+    "hist": "HISTggAAAL94nO3SywnCUBBA0clLYkS3LrUCi0grlqJgBxZnG5agYGZz5WGEgJt7QIb55P1wf71dIo7neCtTbF6/3eF+ivERkiRJkiRJkiRJkiRJkiT9S1Opt1PskWfcTLHDXF+pb1Ev6GdcY44x+wUx+y3qgXrGnG8QC+ZSh3xV2Y/n5f0S7zmgn/Pch+9XMMfv+G65zoA878/vAv0eOd+L6xXkrAdy1mv4v/2Ws17rz8Vzzt1/qf1+tfR5ll7vY/0nEdkGJg=="
+    }
+
+The encoded histogram can be decoded and added to an aggergation histogram using very few
+instructions, for example with the python version of HdrHistogram:
+
+    histogram = HdrHistogram(LOWEST, IMPORTED_MAX_LATENCY, 2)
+    encoded = json_res['hist']
+    histogram.decode_and_add(encoded)
+
+## Build ##
+
+This fork no longer holds a copy of the HDR histogram code as it is not easy to maintain
+such copy. Instead it has a dependency on the C version of HdrHistogram in Git:
+
+    https://github.com/HdrHistogram/HdrHistogram_c
+
+To build wrk2 it is necessary to first build and install that version of HdrHistogram.
+Check for the instructions for details, normally it should only require CMake to be installed, then:
+  
+     cmake
+     make install
+
+Once HdrHistogram_c is installed, wrk2 can be built using "make".
+
+## Original wrk2 Readme
 
   wrk2 is wrk modifed to produce a constant throughput load, and
   accurate latency details to the high 9s (i.e. can produce

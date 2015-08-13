@@ -2,6 +2,7 @@
 #define WRK_H
 
 #include "config.h"
+#include <stdio.h>
 #include <pthread.h>
 #include <inttypes.h>
 #include <sys/types.h>
@@ -13,7 +14,6 @@
 #include "ae.h"
 #include "script.h"
 #include "http_parser.h"
-#include "hdr_histogram.h"
 
 #define VERSION  "3.1.1"
 #define RECVBUF  8192
