@@ -146,7 +146,7 @@ void gen_stats(uint64_t start) {
             }
             printf("},\n");
         }
-        printf("\"total_req\": %"PRIu64", \"rps\": %.2Lf, \"rx_bps\": %sB\",\n",
+        printf("\"total_req\": %"PRIu64", \"rps\": %.2Lf, \"rx_bps\": \"%sB\",\n",
                complete, req_per_s, format_binary(bytes_per_s));
         if (hdr_log_encode(latency_histogram, &encoded)) {
             encoded = "";
