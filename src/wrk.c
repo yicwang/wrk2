@@ -152,6 +152,7 @@ void gen_stats(uint64_t start) {
             encoded = "";
         }
         printf("\"hist\": \"%s\"\n}\n", encoded);
+        fflush(stdout);
         free(encoded);
     } else {
 
