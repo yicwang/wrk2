@@ -6,16 +6,18 @@
 #include <pthread.h>
 #include <inttypes.h>
 #include <sys/types.h>
+#include <netdb.h>
+#include <sys/socket.h>
 
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <lua.h>
 
 #include "stats.h"
 #include "ae.h"
-#include "script.h"
 #include "http_parser.h"
 
-#define VERSION  "3.1.1"
+#define VERSION  "4.0.0"
 #define RECVBUF  8192
 #define SAMPLES  100000000
 
@@ -27,6 +29,7 @@ typedef struct {
     pthread_t thread;
     pthread_mutex_t mutex;
     aeEventLoop *loop;
+    struct addrinfo *addr;
     uint64_t connections;
     int interval;
     uint64_t stop_at;
@@ -43,6 +46,12 @@ typedef struct {
     errors errors;
     struct connection *cs;
 } thread;
+
+typedef struct {
+    char  *buffer;
+    size_t length;
+    char  *cursor;
+} buffer;
 
 typedef struct connection {
     thread *thread;

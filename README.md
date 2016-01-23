@@ -1,4 +1,5 @@
 # wrk2
+[![Gitter](https://badges.gitter.im/Join Chat.svg)](https://gitter.im/giltene/wrk2?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 **a HTTP benchmarking tool based mostly on wrk**
 
@@ -95,6 +96,10 @@ Once HdrHistogram_c is installed, wrk2 can be built using "make".
   to be sent per the "plan" to the time that it actually arrived), wrk2's
   latency reporting is significantly more accurate (as in "correct") than
   that of wrk's current (Nov. 2014) execution model.
+
+  It is important to note that in wrk2's current constant-throughput
+  implementation, measured latencies are [only] accurate to a +/- ~1 msec
+  granularity, due to OS sleep time behavior.
 
   wrk2 is currently in experimental/development mode, and may well be
   merged into wrk in the future if others see fit to adopt it's changes.
